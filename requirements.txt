@@ -5,6 +5,7 @@ typing
 overrides
 tqdm
 nltk
+torch
 allennlp==0.2.3
 pytz
 tensorboard-pytorch

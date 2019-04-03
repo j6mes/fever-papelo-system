@@ -1,10 +1,8 @@
 import argparse
 import json
 import os
-import re
 import math
 import unicodedata
-from collections import defaultdict
 
 from allennlp.data.tokenizers.word_splitter import SimpleWordSplitter
 from tqdm import tqdm
@@ -12,10 +10,7 @@ from tqdm import tqdm
 from common.util.log_helper import LogHelper
 from retrieval.top_n import TopNDocsTopNSents
 from retrieval.fever_doc_db import FeverDocDB
-from common.dataset.reader import JSONLineReader
-from rte.riedel.data import FEVERGoldFormatter, FEVERLabelSchema
-from text_utils import TextEncoder
-from utils import encode_dataset, find_trainable_variables
+
 import joblib
 import tensorflow as tf
 import random
@@ -23,9 +18,8 @@ import numpy as np
 from fever.api.web_server import fever_web_api
 
 from opt import adam, warmup_cosine, warmup_linear, warmup_constant
-from datasets import rocstories, entailment, _entailment
 from text_utils import TextEncoder
-from utils import encode_dataset, flatten, iter_data, find_trainable_variables, get_ema_vars, convert_gradient_to_tensor, shape_list, ResultLogger, assign_to_gpu, average_grads, make_path
+from utils import encode_dataset, iter_data, find_trainable_variables, get_ema_vars, convert_gradient_to_tensor, shape_list, assign_to_gpu
 
 def gelu(x):
     return 0.5*x*(1+tf.tanh(math.sqrt(2/math.pi)*(x+0.044715*tf.pow(x, 3))))
@@ -303,6 +297,7 @@ def resolve_evidence(sents):
     return found_evidence
 
 def make_instances(master, evidence):
+    global max_sent_len
     instances = []
 
     for idx, evi in enumerate(evidence):
@@ -317,8 +312,8 @@ def make_instances(master, evidence):
         premise = "[ " + tokenized_title + " ] " + premise
 
         premise_words = premise.split(" ")
-        if len(premise_words) > args.max_sent_len:
-            premise = " ".join(premise_words[0:args.max_sent_len])
+        if len(premise_words) > max_sent_len:
+            premise = " ".join(premise_words[0:max_sent_len])
 
         hypothesis = master["tokenized_claim"]
         instances.append({"index":idx,
@@ -334,12 +329,13 @@ def make_instances(master, evidence):
     return instances
 
 def predict_sub_instances(text_encoder, sub_instances):
+    global dataset
     prems, hyps, ys = zip(*[(sub["premise"], sub["hypothesis"], sub["label"]) for sub in sub_instances])
     test_set = encode_dataset([(prems, hyps, ys)], encoder=text_encoder)
     (tst_p, tst_h, teY) = test_set[0]
     teX, teM = transform_entailment(tst_p, tst_h)
-    pred_fn = pred_fns[args.dataset]
-    label_decoder = label_decoders[args.dataset]
+    pred_fn = pred_fns[dataset]
+    label_decoder = label_decoders[dataset]
 
     predictions = pred_fn(iter_predict(teX, teM))
     if label_decoder is not None:
@@ -347,33 +343,24 @@ def predict_sub_instances(text_encoder, sub_instances):
 
     return predictions
 
-def xx():
-    print(n_vocab)
+def fever_app(caller):
+    global db, tokenizer, text_encoder, encoder, X_train, M_train, X, M, Y_train, Y,params,sess, n_batch_train, db_file, \
+        drqa_index, max_page, max_sent, encoder_path, bpe_path, n_ctx, n_batch, model_file
+    global n_vocab,n_special,n_y,max_len,clf_token,eval_lm_losses,eval_clf_losses,eval_mgpu_clf_losses,eval_logits, \
+        eval_mgpu_logits,eval_logits
+    LogHelper.setup()
+    logger = LogHelper.get_logger("papelo")
 
-
-def update_class(qid, value, h):
-    if (qid in h):
-        if (value == 2):
-            if (h[qid] != 0):
-                h[qid] = value
-        if (value == 0):
-            h[qid] = value
-    else:
-        h[qid] = value
-
-def setup():
-    global db, tokenizer, text_encoder, encoder, X_train, M_train, X, M, Y_train, Y,params,sess, n_batch_train
-    global n_vocab,n_special,n_y,max_len,clf_token,eval_lm_losses,eval_clf_losses,eval_mgpu_clf_losses,eval_logits, eval_mgpu_logits,eval_logits
     logger.info("Load FEVER DB")
-    db = FeverDocDB(args.db_file)
-    retrieval = TopNDocsTopNSents(db, args.max_page, args.max_sent, True, False, args.drqa_index)
+    db = FeverDocDB(db_file)
+    retrieval = TopNDocsTopNSents(db, max_page, max_sent, True, False, drqa_index)
 
     logger.info("Init word tokenizer")
     tokenizer = SimpleWordSplitter()
 
     # Prepare text encoder
     logger.info("Load BPE Text Encoder")
-    text_encoder = TextEncoder(args.encoder_path, args.bpe_path)
+    text_encoder = TextEncoder(encoder_path, bpe_path)
     encoder = text_encoder.encoder
     n_vocab = len(text_encoder.encoder)
 
@@ -383,17 +370,17 @@ def setup():
     encoder['_classify_'] = len(encoder)
     clf_token = encoder['_classify_']
     n_special = 3
-    max_len = args.n_ctx // 2 - 2
+    max_len = n_ctx // 2 - 2
 
-    n_batch_train = args.n_batch
+    n_batch_train = n_batch
 
     logger.info("Create TF Placeholders")
-    X_train = tf.placeholder(tf.int32, [args.n_batch, 1, args.n_ctx, 2])
-    M_train = tf.placeholder(tf.float32, [args.n_batch, 1, args.n_ctx])
-    X = tf.placeholder(tf.int32, [None, 1, args.n_ctx, 2])
-    M = tf.placeholder(tf.float32, [None, 1, args.n_ctx])
+    X_train = tf.placeholder(tf.int32, [n_batch, 1, n_ctx, 2])
+    M_train = tf.placeholder(tf.float32, [n_batch, 1, n_ctx])
+    X = tf.placeholder(tf.int32, [None, 1, n_ctx, 2])
+    M = tf.placeholder(tf.float32, [None, 1, n_ctx])
 
-    Y_train = tf.placeholder(tf.int32, [args.n_batch])
+    Y_train = tf.placeholder(tf.int32, [n_batch])
     Y = tf.placeholder(tf.int32, [None])
 
     logger.info("Model Setup")
@@ -402,9 +389,11 @@ def setup():
 
     logger.info("Create TF Session")
     params = find_trainable_variables('model')
-    sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True))
+
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=float(os.getenv("TF_GPU_MEMORY_FRACTION","0.5")))
+    sess = tf.Session(config=tf.ConfigProto(allow_soft_placement=True, gpu_options=gpu_options))
     sess.run(tf.global_variables_initializer())
-    sess.run([p.assign(ip) for p, ip in zip(params, joblib.load(args.model_file))])
+    sess.run([p.assign(ip) for p, ip in zip(params, joblib.load(model_file))])
 
     logger.info("Ready")
 
@@ -440,55 +429,46 @@ def setup():
 
         return predictions
 
-    return fever_web_api(predict)
+    return caller(predict)
+
+def web():
+    return fever_app(fever_web_api)
+
 
 if __name__ == "__main__":
+    call_method = None
 
+    config = json.load(open(os.getenv("CONFIG_FILE","configs/config-docker.json")))
+    globals().update(config)
+    print(globals())
     random.seed(42)
     np.random.seed(42)
     tf.set_random_seed(42)
 
-    LogHelper.setup()
-    logger = LogHelper.get_logger(__name__)
+    def cli_method(predict_function):
+        global call_method
+        call_method = predict_function
+
+    def cli():
+        return fever_app(cli_method)
+
+    cli()
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--db-file', type=str, help='drqa doc db file')
-    parser.add_argument('--drqa-index', type=str, help='drqa index file')
-    parser.add_argument('--max-page',type=int, default=5)
-    parser.add_argument('--max-sent',type=int, default=50)
-    parser.add_argument('--whole-docs', action='store_true', default=True)
-    parser.add_argument("--max-sent-len", help="maximum sentence length", type=int, default=200)
-
-    parser.add_argument('--model-file', type=str, default='save/best_params.jl')
-
-    parser.add_argument('--n_batch', type=int, default=8)
-    parser.add_argument('--n_ctx', type=int, default=512)
-    parser.add_argument('--dataset', type=str, default="entailment")
-    parser.add_argument('--n_embd', type=int, default=768)
-    parser.add_argument('--n_head', type=int, default=12)
-    parser.add_argument('--n_layer', type=int, default=12)
-    parser.add_argument('--embd_pdrop', type=float, default=0.1)
-    parser.add_argument('--attn_pdrop', type=float, default=0.1)
-    parser.add_argument('--resid_pdrop', type=float, default=0.1)
-    parser.add_argument('--clf_pdrop', type=float, default=0.1)
-    parser.add_argument('--l2', type=float, default=0.01)
-    parser.add_argument('--vector_l2', action='store_true')
-    parser.add_argument('--n_gpu', type=int, default=1)
-    parser.add_argument('--opt', type=str, default='adam')
-    parser.add_argument('--afn', type=str, default='gelu')
-    parser.add_argument('--lr_schedule', type=str, default='warmup_linear')
-    parser.add_argument('--encoder_path', type=str, default='model/encoder_bpe_40000.json')
-    parser.add_argument('--bpe_path', type=str, default='model/vocab_40000.bpe')
-    parser.add_argument('--n_transfer', type=int, default=12)
-    parser.add_argument('--lm_coef', type=float, default=0.5)
-    parser.add_argument('--b1', type=float, default=0.9)
-    parser.add_argument('--b2', type=float, default=0.999)
-    parser.add_argument('--e', type=float, default=1e-8)
+    parser.add_argument("--in-file")
+    parser.add_argument("--out-file")
     args = parser.parse_args()
 
-    globals().update(args.__dict__)
+    claims = []
 
+    with open(args.in_file,"r") as in_file:
+        for text_line in in_file:
+            line = json.loads(text_line)
+            claims.append(line)
 
+    ret = call_method(claims)
 
-    app = setup()
-    app.run()
+    with open(args.out_file,"w+") as out_file:
+        for prediction in ret:
+            out_file.write(json.dumps(prediction)+"\n")
 
