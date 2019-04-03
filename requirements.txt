@@ -12,6 +12,7 @@ tensorboard-pytorch
 fever-drqa
 fever-scorer
 tensorflow>=1.13
+tensorflow-gpu>=1.13
 spacy
 joblib
 pandas
