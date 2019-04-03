@@ -21,6 +21,10 @@ RUN apt-get install -y --no-install-recommends --allow-unauthenticated \
     libffi-dev \
     software-properties-common
 
+RUN conda update -q conda
+RUN conda info -a
+RUN conda install -c pytorch pytorch=0.3.1 torchvision
+
 RUN mkdir /fever/
 RUN mkdir /work
 
@@ -37,7 +41,10 @@ RUN pip install -r requirements.txt
 RUN python -m spacy download en
 
 RUN pip uninstall -y tensorflow tensorflow-gpu
-RUN conda install tensorflow=1.13.1 tensorflow-gpu=1.13.1
+RUN conda info tensorflow
+RUN conda install tensorflow
+RUN conda info tensorflow-gpu
+RUN conda install tensorflow-gpu
 
 RUN mkdir /fever/fever2018-retrieval
 RUN mkdir /fever/finetune-transformer-lm

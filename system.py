@@ -449,7 +449,7 @@ def web():
 
 
 if __name__ == "__main__":
-    call_method = Non
+    call_method = None
 
     def cli_method(predict_function):
         global call_method
