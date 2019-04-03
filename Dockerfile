@@ -32,8 +32,6 @@ WORKDIR /fever/fever2018-model
 RUN cat best_params.all-title-one-r55.jl.a? >best_params.all-title-one-r55.jl && rm -v best_params.all-title-one-r55.jl.a?
 WORKDIR /fever/
 
-RUN conda install pytorch
-
 ADD requirements.txt /fever
 RUN pip install -r requirements.txt
 RUN python -m spacy download en
