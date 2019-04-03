@@ -344,12 +344,25 @@ def predict_sub_instances(text_encoder, sub_instances):
     return predictions
 
 def fever_app(caller):
+
+
     global db, tokenizer, text_encoder, encoder, X_train, M_train, X, M, Y_train, Y,params,sess, n_batch_train, db_file, \
         drqa_index, max_page, max_sent, encoder_path, bpe_path, n_ctx, n_batch, model_file
     global n_vocab,n_special,n_y,max_len,clf_token,eval_lm_losses,eval_clf_losses,eval_mgpu_clf_losses,eval_logits, \
         eval_mgpu_logits,eval_logits
+
     LogHelper.setup()
     logger = LogHelper.get_logger("papelo")
+
+    logger.info("Load config")
+    config = json.load(open(os.getenv("CONFIG_FILE","configs/config-docker.json")))
+    globals().update(config)
+    print(globals())
+
+    logger.info("Set Seeds")
+    random.seed(42)
+    np.random.seed(42)
+    tf.set_random_seed(42)
 
     logger.info("Load FEVER DB")
     db = FeverDocDB(db_file)
@@ -436,14 +449,7 @@ def web():
 
 
 if __name__ == "__main__":
-    call_method = None
-
-    config = json.load(open(os.getenv("CONFIG_FILE","configs/config-docker.json")))
-    globals().update(config)
-    print(globals())
-    random.seed(42)
-    np.random.seed(42)
-    tf.set_random_seed(42)
+    call_method = Non
 
     def cli_method(predict_function):
         global call_method
