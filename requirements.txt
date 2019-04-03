@@ -10,7 +10,7 @@ pytz
 tensorboard-pytorch
 fever-drqa
 fever-scorer
-tensorflow-gpu==1.4.1
+tensorflow>=1.13
 spacy
 joblib
 pandas

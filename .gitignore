@@ -1,3 +1,6 @@
 *.pyc
 .DS_Store
 .idea
+log/
+model/
+fever2018-model/
