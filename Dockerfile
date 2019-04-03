@@ -44,6 +44,7 @@ ADD fever2018-retrieval /fever/fever2018-retrieval
 ADD finetune-transformer-lm /fever/finetune-transformer-lm
 ADD *.py /fever/
 ADD configs /fever/configs
+ADD predict.sh /fever/
 
 ENV PYTHONPATH fever2018-retrieval/src:finetune-transformer-lm:.
 CMD ["waitress-serve", "--host=0.0.0.0","--port=5000", "--call", "system:web"]
