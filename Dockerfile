@@ -36,6 +36,9 @@ ADD requirements.txt /fever
 RUN pip install -r requirements.txt
 RUN python -m spacy download en
 
+RUN pip uninstall -y tensorflow tensorflow-gpu
+RUN conda install tensorflow=1.13.1 tensorflow-gpu=1.13.1
+
 RUN mkdir /fever/fever2018-retrieval
 RUN mkdir /fever/finetune-transformer-lm
 RUN mkdir /fever/configs
