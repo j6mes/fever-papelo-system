@@ -426,10 +426,10 @@ def fever_app(caller):
 
             if len(support_evidence):
                 predicted_label = "SUPPORTS"
-                predicted_evidence = [found_evidence[i] for i in support_evidence]
+                predicted_evidence = [[found_evidence[i]["title"], found_evidence[i]["line_number"]] for i in support_evidence]
             elif len(refute_evidence):
                 predicted_label = "REFUTES"
-                predicted_evidence = [found_evidence[i] for i in refute_evidence]
+                predicted_evidence = [[found_evidence[i]["title"], found_evidence[i]["line_number"]] for i in refute_evidence]
             else:
                 predicted_label = "NOT ENOUGH INFO"
                 predicted_evidence = []
