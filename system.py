@@ -317,7 +317,7 @@ def make_instances(master, evidence):
 
         hypothesis = master["tokenized_claim"]
         instances.append({"index":idx,
-                          "id":master["id"],
+                          "id":master["id"] if "id" in master else 0,
                           "premise": premise,
                           "hypothesis":hypothesis,
                           "label": label
