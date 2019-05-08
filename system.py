@@ -287,13 +287,25 @@ def process_line(method, line):
 
 def resolve_evidence(sents):
     found_evidence = []
+
     for found_sentence in sents:
         title = unicodedata.normalize('NFD', str(found_sentence[0]))
         linenum = found_sentence[1]
-        sentence_text = db.get_doc_lines(title).split("\n")[linenum].split("\t")[1]
-        db.get_doc_lines(title)
-        label = "UNCLASSIFIED"
-        found_evidence.append({"title": title, "line_number": linenum, "text": sentence_text, "label": label})
+        doc = db.get_doc_lines(title)
+
+        if doc is not None:
+            if linenum in doc.split("\n"):
+                line = doc.split("\n")[linenum]
+                sentence_text = line.split("\t")
+
+                label = "UNCLASSIFIED"
+
+                if len(sentence_text)>1:
+                    found_evidence.append({"title": title,
+                                           "line_number": linenum,
+                                           "text": sentence_text[1],
+                                           "label": label})
+
     return found_evidence
 
 def make_instances(master, evidence):
