@@ -300,7 +300,7 @@ def resolve_evidence(sents):
 
                 label = "UNCLASSIFIED"
 
-                if len(sentence_text)>1:
+                if len(sentence_text)>=2:
                     found_evidence.append({"title": title,
                                            "line_number": linenum,
                                            "text": sentence_text[1],
@@ -342,6 +342,8 @@ def make_instances(master, evidence):
 
 def predict_sub_instances(text_encoder, sub_instances):
     global dataset
+    if not len(sub_instances):
+        return []
     prems, hyps, ys = zip(*[(sub["premise"], sub["hypothesis"], sub["label"]) for sub in sub_instances])
     test_set = encode_dataset([(prems, hyps, ys)], encoder=text_encoder)
     (tst_p, tst_h, teY) = test_set[0]
