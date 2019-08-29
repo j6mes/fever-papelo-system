@@ -293,15 +293,12 @@ def resolve_evidence(sents):
         linenum = found_sentence[1]
         doc = db.get_doc_lines(title)
 
-        if doc is not None:
-            if linenum in doc.split("\n"):
-                line = doc.split("\n")[linenum]
-                sentence_text = line.split("\t")
+        line = doc.split("\n")[linenum]
+        sentence_text = line.split("\t")
 
-                label = "UNCLASSIFIED"
+        label = "UNCLASSIFIED"
 
-                if len(sentence_text)>=2:
-                    found_evidence.append({"title": title,
+        found_evidence.append({"title": title,
                                            "line_number": linenum,
                                            "text": sentence_text[1],
                                            "label": label})
