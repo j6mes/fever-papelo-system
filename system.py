@@ -266,7 +266,6 @@ def transform_entailment(X1, X2):
 
 def iter_predict(Xs, Ms):
     logits = []
-    print("Predicting")
     for xmb, mmb in iter_data(Xs, Ms, n_batch=n_batch_train, truncate=False, verbose=True):
         n = len(xmb)
         if n == n_batch_train:
