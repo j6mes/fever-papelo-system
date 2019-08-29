@@ -295,10 +295,10 @@ def resolve_evidence(sents):
 
         line = doc.split("\n")[linenum]
         sentence_text = line.split("\t")
+        if len(sentence_text) >= 2:
+            label = "UNCLASSIFIED"
 
-        label = "UNCLASSIFIED"
-
-        found_evidence.append({"title": title,
+            found_evidence.append({"title": title,
                                            "line_number": linenum,
                                            "text": sentence_text[1],
                                            "label": label})
